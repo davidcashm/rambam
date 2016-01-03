@@ -2,6 +2,7 @@ package com.ezmashay.rambam;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
@@ -48,6 +49,8 @@ public class Rambam extends AppCompatActivity {
     ListView listView;
 
     int current_book_idx = -1;
+    // The currently opened html file, if any
+    String htm_name = null;
 
     // Does Java have enums?
     static final int STATE_MAIN_MENU = 0;
@@ -84,6 +87,7 @@ public class Rambam extends AppCompatActivity {
             Intent i = new Intent(context, TheWebActivity.class);
             i.putExtra("PAGE", file);
             startActivity(i);
+            htm_name = file;
         }
         else {
             for (int i = 0; i < values.length; i++) {
@@ -103,10 +107,12 @@ public class Rambam extends AppCompatActivity {
                     Intent i = new Intent(context, TheWebActivity.class);
                     i.putExtra("PAGE", file);
                     startActivity(i);
+                    htm_name = file;
                 }
             });
 
             state = STATE_BOOK_MENU;
+            current_book_idx = book_idx;
         }
     }
 
@@ -127,6 +133,7 @@ public class Rambam extends AppCompatActivity {
         });
 
         state = STATE_MAIN_MENU;
+        current_book_idx = -1;
     }
 
     @Override
@@ -168,7 +175,23 @@ public class Rambam extends AppCompatActivity {
             // Just give some sort of error message and exit, I guess
         }
 
-        set_main_menu_view();
+        SharedPreferences prefs = getSharedPreferences("my_prefs", MODE_PRIVATE);
+        state = prefs.getInt("state", STATE_MAIN_MENU);
+        current_book_idx = prefs.getInt("book_idx", STATE_MAIN_MENU);
+        if (state == STATE_BOOK_MENU) {
+            set_chapter_view(current_book_idx);
+        }
+        else {
+            set_main_menu_view();
+        }
+
+        htm_name = prefs.getString("htm", null);
+        if (htm_name != null) {
+            // Just start up that htm file.
+            Intent i = new Intent(this, TheWebActivity.class);
+            i.putExtra("PAGE", htm_name);
+            startActivity(i);
+        }
     }
 
     @Override
@@ -192,4 +215,16 @@ public class Rambam extends AppCompatActivity {
 
         return super.onOptionsItemSelected(item);
     }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        SharedPreferences prefs = getSharedPreferences("my_prefs", MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putInt("state", state);
+        editor.putInt("book_idx", current_book_idx);
+        editor.commit();
+    }
+
+
 }

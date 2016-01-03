@@ -1,6 +1,7 @@
 package com.ezmashay.rambam;
 
 import android.annotation.SuppressLint;
+import android.content.SharedPreferences;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -32,9 +33,12 @@ public class TheWebActivity extends AppCompatActivity {
      */
     private static final int UI_ANIMATION_DELAY = 300;
 
-//    private View mContentView;
+    //    private View mContentView;
 //    private View mControlsView;
     private boolean mVisible;
+
+    // Indicate whether we exited normally - i.e. via back press
+    private boolean normal_exit = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,8 +66,21 @@ public class TheWebActivity extends AppCompatActivity {
 
         // Load the web page
 //        String fname = "file:///android_asset/" + getIntent().getExtras().getString("PAGE");
-        String fname = "file:///android_res/raw/" + getIntent().getExtras().getString("PAGE");
+
+        // Save the fact that we're loaded, so that the main app can re-load
+        // if we get killed rather than leaving through a normal back press
+        String htm_name = getIntent().getExtras().getString("PAGE");
+        SharedPreferences prefs = getSharedPreferences("my_prefs", MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putString("htm", htm_name);
+        editor.commit();
+
+        String fname = "file:///android_res/raw/" + htm_name;
         WebView v = (WebView) findViewById(R.id.fullscreen_content);
+
+        // Check if there was a previous scroll position
+        int scroll_pos = prefs.getInt("webscroll", 0);
+        v.setScrollY(scroll_pos);
         v.loadUrl(fname);
     }
 
@@ -171,5 +188,42 @@ public class TheWebActivity extends AppCompatActivity {
     private void delayedHide(int delayMillis) {
         mHideHandler.removeCallbacks(mHideRunnable);
         mHideHandler.postDelayed(mHideRunnable, delayMillis);
+    }
+
+    @Override
+    public void onBackPressed() {
+        // Set htm shared preference to null to indicate that there
+        // is no longer an open htm file
+        SharedPreferences prefs = getSharedPreferences("my_prefs", MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putString("htm", null);
+        editor.commit();
+
+        // Let onPause know that we exited normally, so that it doesn't need to save state.
+        normal_exit = true;
+
+        super.onBackPressed();
+    }
+
+    @Override
+    public void onPause() {
+        SharedPreferences prefs = getSharedPreferences("my_prefs", MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        WebView v = (WebView) findViewById(R.id.fullscreen_content);
+        // Save scroll position for later.  If the user exited in the normal
+        // way (i.e. back press), set it to 0 so that the next entry starts at the top of the page.
+        int scroll;
+        if (normal_exit) {
+            scroll = 0;
+            // Reset normal exit for future use.
+            normal_exit = false;
+        }
+        else {
+            scroll = v.getScrollY();
+        }
+
+        editor.putInt("webscroll",scroll);
+        editor.commit();
+        super.onPause();
     }
 }
